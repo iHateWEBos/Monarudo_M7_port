@@ -31,35 +31,35 @@
 #include <trace/events/cpufreq_interactive.h>
 
 
-#define DEF_SAMPLING_RATE					(50000)
+#define DEF_SAMPLING_RATE			(50000)
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
-#define DEF_FREQUENCY_UP_THRESHOLD			(75)
-#define DEF_SAMPLING_DOWN_FACTOR			(1)
-#define MAX_SAMPLING_DOWN_FACTOR			(100000)
+#define DEF_FREQUENCY_UP_THRESHOLD		(75)
+#define DEF_SAMPLING_DOWN_FACTOR		(1)
+#define MAX_SAMPLING_DOWN_FACTOR		(100000)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
-#define MICRO_FREQUENCY_UP_THRESHOLD		(80)
+#define MICRO_FREQUENCY_UP_THRESHOLD		(90)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
-#define MIN_FREQUENCY_UP_THRESHOLD			(11)
-#define MAX_FREQUENCY_UP_THRESHOLD			(100)
+#define MIN_FREQUENCY_UP_THRESHOLD		(11)
+#define MAX_FREQUENCY_UP_THRESHOLD		(100)
 #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
-#define DBS_INPUT_EVENT_MIN_FREQ			(1296000)
+#define DBS_INPUT_EVENT_MIN_FREQ		(1134000)
 #define DEF_UI_DYNAMIC_SAMPLING_RATE		(30000)
-#define DBS_UI_SAMPLING_MIN_TIMEOUT			(30)
-#define DBS_UI_SAMPLING_MAX_TIMEOUT			(1000)
-#define DBS_UI_SAMPLING_TIMEOUT				(80)
-#define DBS_SWITCH_MODE_TIMEOUT				(1000)
+#define DBS_UI_SAMPLING_MIN_TIMEOUT		(30)
+#define DBS_UI_SAMPLING_MAX_TIMEOUT		(1000)
+#define DBS_UI_SAMPLING_TIMEOUT			(80)
+#define DBS_SWITCH_MODE_TIMEOUT			(1000)
 
-#define MIN_SAMPLING_RATE_RATIO				(2)
+#define MIN_SAMPLING_RATE_RATIO			(2)
 
 static unsigned int min_sampling_rate;
 static unsigned int skip_ondemand = 0;
 
-#define LATENCY_MULTIPLIER					(1000)
-#define MIN_LATENCY_MULTIPLIER				(20)
-#define TRANSITION_LATENCY_LIMIT			(10 * 1000 * 1000)
+#define LATENCY_MULTIPLIER			(1000)
+#define MIN_LATENCY_MULTIPLIER			(100)
+#define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
 
-#define POWERSAVE_BIAS_MAXLEVEL				(1000)
-#define POWERSAVE_BIAS_MINLEVEL				(-1000)
+#define POWERSAVE_BIAS_MAXLEVEL			(1000)
+#define POWERSAVE_BIAS_MINLEVEL			(-1000)
 
 static void do_dbs_timer(struct work_struct *work);
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
@@ -1244,6 +1244,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 			if (policy->cur < dbs_tuners_ins.sync_freq)
 				dbs_freq_increase(policy, cur_load,
 						dbs_tuners_ins.sync_freq);
+			else
+				trace_cpufreq_interactive_already (policy->cpu, cur_load, policy->cur,policy->cur);
 			return;
 		}
 
@@ -1252,6 +1254,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 			if (policy->cur < dbs_tuners_ins.optimal_freq)
 				dbs_freq_increase(policy, cur_load,
 						dbs_tuners_ins.optimal_freq);
+			else
+				trace_cpufreq_interactive_already (policy->cpu, cur_load, policy->cur,policy->cur);
 			return;
 		}
 	}
@@ -1412,7 +1416,7 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 			
 			spin_lock_irqsave(&input_boost_lock, flags);
 			input_event_boost = true;
-			input_event_boost_expired = jiffies + usecs_to_jiffies(dbs_tuners_ins.sampling_rate * 2);
+			input_event_boost_expired = jiffies + usecs_to_jiffies(dbs_tuners_ins.sampling_rate * 4);
 			spin_unlock_irqrestore(&input_boost_lock, flags);
 
 			for_each_online_cpu(i) {
@@ -1514,28 +1518,7 @@ static void dbs_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id dbs_ids[] = {
-	/* multi-touch touchscreen */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT_MASK(EV_ABS) },
-		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
-			BIT_MASK(ABS_MT_POSITION_X) |
-			BIT_MASK(ABS_MT_POSITION_Y) },
-	},
-	/* touchpad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
-	},
-	/* Keypad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_KEY) },
-	},
+	{ .driver_info = 1 },
 	{ },
 };
 
